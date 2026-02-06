@@ -1,0 +1,42 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Ticket {
+  id                Int          @id @default(autoincrement())
+  subject           String
+  messages          Message[]
+  requesterEmail    String
+  recipients        String[]
+  originalMessageId String       @unique
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  attachments       Attachment[]
+}
+
+model Message {
+  id          String       @id @default(uuid())
+  content     String
+  direction   String
+  messageId   String       @unique
+  createdAt   DateTime     @default(now())
+  ticketId    Int
+  ticket      Ticket       @relation(fields: [ticketId], references: [id])
+  attachments Attachment[]
+}
+
+model Attachment {
+  id        String  @id @default(uuid())
+  filename  String
+  mimeType  String
+  data      String  @db.Text
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id])
+  ticket    Ticket? @relation(fields: [ticketId], references: [id])
+  ticketId  Int?
+}
