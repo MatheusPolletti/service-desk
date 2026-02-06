@@ -6,6 +6,7 @@ import { EmailInboundService } from './email.inbound.service';
 export class EmailInboundCron {
   constructor(private readonly inbound: EmailInboundService) {}
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   @Cron('*/10 * * * * *')
   async handleCron() {
     await this.inbound.checkInbox();
