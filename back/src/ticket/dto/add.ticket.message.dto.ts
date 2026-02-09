@@ -1,9 +1,13 @@
-import { IsBoolean, IsEmail, IsString } from 'class-validator';
+import { TicketStatus } from '@prisma/client';
+import {
+  IsBoolean,
+  IsEmail,
+  IsEnum,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class AddTicketMessageDTO {
-  @IsString()
-  subject: string;
-
   @IsString()
   content: string;
 
@@ -12,4 +16,9 @@ export class AddTicketMessageDTO {
 
   @IsEmail({}, { each: true })
   recipients: string[];
+
+  @IsOptional()
+  //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+  @IsEnum(TicketStatus)
+  status?: TicketStatus;
 }

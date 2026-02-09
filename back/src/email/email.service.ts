@@ -24,10 +24,16 @@ export class EmailService {
       references,
     } = params;
 
+    const tag = `[Ticket #${ticketId}]`;
+
+    const finalSubject = ticketSubject.includes(tag)
+      ? ticketSubject
+      : `${tag} ${ticketSubject}`;
+
     await this.mailerService.sendMail({
       from,
       to,
-      subject: `[Ticket #${ticketId}] ${ticketSubject}`,
+      subject: finalSubject,
       html: `<p>${content}</p>`,
       text: content,
       headers: {

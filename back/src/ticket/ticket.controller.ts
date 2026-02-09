@@ -4,15 +4,25 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
 } from '@nestjs/common';
 import { TicketService } from './ticket.service';
 import { CreateTicketDTO } from './dto/create.ticket.dto';
 import { AddTicketMessageDTO } from './dto/add.ticket.message.dto';
+import { UpdateTicketStatusDTO } from './dto/update.ticket.status.dto';
 
 @Controller('ticket')
 export class TicketController {
   constructor(private readonly ticketService: TicketService) {}
+
+  @Patch('status/:id')
+  async updateStatus(
+    @Param('id', ParseIntPipe) ticketId: number,
+    @Body() dto: UpdateTicketStatusDTO,
+  ) {
+    return this.ticketService.updateStatus(ticketId, dto.status);
+  }
 
   @Post('create')
   async createTicket(@Body() createTicketDTO: CreateTicketDTO) {

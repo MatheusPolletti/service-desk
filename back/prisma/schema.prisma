@@ -7,9 +7,17 @@ datasource db {
   provider = "postgresql"
 }
 
+enum TicketStatus {
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
 model Ticket {
   id                Int          @id @default(autoincrement())
   subject           String
+  status            TicketStatus @default(OPEN)
   messages          Message[]
   requesterEmail    String
   recipients        String[]
