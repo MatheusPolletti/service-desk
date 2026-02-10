@@ -14,6 +14,14 @@ export class EmailInboundService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  private getSlaDeadline(): Date {
+    const deadline = new Date();
+
+    deadline.setHours(deadline.getHours() + 4);
+
+    return deadline;
+  }
+
   private cleanEmailContent(text: string): string {
     if (!text) return '';
 
@@ -198,6 +206,8 @@ export class EmailInboundService {
         recipients: validRecipients,
         originalMessageId: messageId,
         status: 'OPEN',
+        slaDueDate: this.getSlaDeadline(),
+        slaStatus: 'OK',
         messages: {
           create: {
             content: cleanContent,
@@ -250,6 +260,8 @@ export class EmailInboundService {
         data: {
           updatedAt: new Date(),
           status: 'OPEN',
+          slaDueDate: this.getSlaDeadline(),
+          slaStatus: 'OK',
         },
       }),
     ]);

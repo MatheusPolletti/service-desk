@@ -1,4 +1,5 @@
-import TicketChat from "@/app/components/ticket-chat";
+import TicketChat from "@/app/components/ticket-chat"; // Seu componente de chat atual
+import TicketSidebar from "@/app/components/ticket-sidebar"; // O novo componente acima
 
 export default async function TicketPage({
   params,
@@ -8,10 +9,14 @@ export default async function TicketPage({
   const resolvedParams = await params;
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl bg-white shadow rounded-lg overflow-hidden">
+    <div className="flex h-screen bg-gray-100 overflow-hidden">
+      <aside className="w-80 shrink-0 bg-white border-r border-gray-200 hidden md:flex flex-col z-20 shadow-sm">
+        <TicketSidebar />
+      </aside>
+
+      <main className="flex-1 flex flex-col min-w-0 bg-white">
         <TicketChat ticketId={Number(resolvedParams.id)} />
-      </div>
+      </main>
     </div>
   );
 }

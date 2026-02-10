@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,7 +30,6 @@ export default function ContactForm() {
     const data = {
       subject: formData.get("subject"),
       content: formData.get("message"),
-      requesterEmail: "matheus.c.polletti@gmail.com",
       recipients: formData.get("recipients"),
     };
 
@@ -43,6 +42,7 @@ export default function ContactForm() {
 
       if (res.ok) {
         setOpen(false);
+        window.location.reload();
       } else {
         console.error("Erro ao criar ticket");
       }
@@ -56,7 +56,7 @@ export default function ContactForm() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-blue-600 hover:bg-blue-700">
+        <Button className="bg-blue-600 hover:bg-blue-700 shadow-sm">
           <Plus className="mr-2 h-4 w-4" /> Novo Chamado
         </Button>
       </DialogTrigger>
@@ -65,45 +65,53 @@ export default function ContactForm() {
         <DialogHeader>
           <DialogTitle>Abrir Novo Chamado</DialogTitle>
           <DialogDescription>
-            Preencha os detalhes abaixo para iniciar um novo atendimento.
+            Informe os dados abaixo. Você receberá atualizações por e-mail.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="recipients">E-mail do Cliente</Label>
+            <Label htmlFor="recipients" className="text-slate-700">
+              Seu E-mail (Solicitante)
+            </Label>
             <Input
               id="recipients"
               name="recipients"
-              placeholder="cliente@exemplo.com"
+              type="email"
+              placeholder="seu.email@empresa.com"
               required
+              className="col-span-3"
             />
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="subject">Assunto</Label>
+            <Label htmlFor="subject" className="text-slate-700">
+              Assunto
+            </Label>
             <Input
               id="subject"
               name="subject"
-              placeholder="Ex: Erro no sistema de login"
+              placeholder="Ex: Não consigo acessar a VPN"
               required
             />
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="message">Descrição do Problema</Label>
+            <Label htmlFor="message" className="text-slate-700">
+              Descrição Detalhada
+            </Label>
             <Textarea
               id="message"
               name="message"
-              placeholder="Descreva o que está acontecendo..."
-              className="min-h-37.5"
+              placeholder="Descreva o problema, mensagens de erro, etc..."
+              className="min-h-37.5 resize-none"
               required
             />
           </div>
 
           <DialogFooter>
             <Button
-              variant="outline"
+              variant="ghost"
               type="button"
               onClick={() => setOpen(false)}
               disabled={loading}
@@ -119,10 +127,12 @@ export default function ContactForm() {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Criando...
+                  Enviando...
                 </>
               ) : (
-                "Criar Ticket"
+                <>
+                  <Send className="mr-2 h-4 w-4" /> Criar Ticket
+                </>
               )}
             </Button>
           </DialogFooter>

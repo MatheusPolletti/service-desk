@@ -7,6 +7,12 @@ datasource db {
   provider = "postgresql"
 }
 
+enum SlaStatus {
+  OK
+  WARNING
+  BREACHED
+}
+
 enum TicketStatus {
   OPEN
   PENDING
@@ -25,6 +31,8 @@ model Ticket {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   attachments       Attachment[]
+  slaDueDate        DateTime?
+  slaStatus         SlaStatus    @default(OK)
 }
 
 model Message {

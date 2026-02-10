@@ -18,7 +18,6 @@ export class AddTicketMessageDTO {
   recipients: string[];
 
   @IsOptional()
-  //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
   @IsEnum(TicketStatus)
   status?: TicketStatus;
 }

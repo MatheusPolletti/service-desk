@@ -1,50 +1,107 @@
 "use client";
 
-import { LogOut } from "lucide-react";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
+import {
+  Reply,
+  ReplyAll,
+  MoreHorizontal,
+  Paperclip,
+  Bold,
+  Italic,
+  Underline,
+  Image as ImageIcon,
+  ChevronRight,
+  ChevronDown,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import Image from "next/image";
 
-function getInitials(email: string) {
-  return email ? email.substring(0, 2).toUpperCase() : "??";
+interface Attachment {
+  id: string;
+  mimeType: string;
+  data: string;
+  filename: string;
 }
 
-function formatEmailDate(dateString: string) {
-  return new Date(dateString).toLocaleString("pt-BR", {
-    weekday: "short",
+interface Message {
+  id: string;
+  content: string;
+  direction: "IN" | "OUT";
+  createdAt: string;
+  attachments: Attachment[];
+}
+
+interface Ticket {
+  id: number;
+  subject: string;
+  requesterEmail: string;
+  recipients: string[];
+  status: string;
+  messages: Message[];
+}
+
+function getInitials(nameOrEmail: string) {
+  const clean = nameOrEmail.replace(/[^a-zA-Z ]/g, "");
+  return clean.substring(0, 1).toUpperCase();
+}
+
+function formatOutlookDate(dateString: string) {
+  const date = new Date(dateString);
+  const weekDay = date.toLocaleDateString("pt-BR", { weekday: "short" });
+  const dayMonthYear = date.toLocaleDateString("pt-BR", {
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
     year: "numeric",
+  });
+  const time = date.toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  const weekDayClean = weekDay.replace(".", "");
+  const weekDayCap =
+    weekDayClean.charAt(0).toUpperCase() + weekDayClean.slice(1);
+
+  return `${weekDayCap}, ${dayMonthYear} ${time}`;
 }
 
 export default function TicketEmailThread({ ticketId }: { ticketId: number }) {
-  const [ticket, setTicket] = useState<any>(null);
+  const [ticket, setTicket] = useState<Ticket | null>(null);
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
+  const [isReplying, setIsReplying] = useState(false);
+  const [expandedMessages, setExpandedMessages] = useState<
+    Record<string, boolean>
+  >({});
 
-  type Attachment = {
-    id: string;
-    mimeType: string;
-    data: string;
-    filename: string;
-  };
+  const editorRef = useRef<HTMLDivElement>(null);
 
   const loadTicket = useCallback(() => {
     fetch(`http://localhost:5000/ticket/get/message/${ticketId}`)
       .then((res) => res.json())
       .then((response) => {
-        if (response.success) {
-          setTicket(response.data);
-        } else {
-          console.error("Erro ao carregar ticket:", response);
+        if (response.success && response.data) {
+          const loadedTicket = response.data;
+
+          if (loadedTicket.messages) {
+            loadedTicket.messages.reverse();
+          }
+
+          setTicket(loadedTicket);
+
+          if (loadedTicket.messages && loadedTicket.messages.length > 0) {
+            const newestMsgId = loadedTicket.messages[0].id;
+            setExpandedMessages((prev) => ({
+              ...prev,
+              [newestMsgId]: true,
+            }));
+          }
         }
       })
-      .catch((err) => console.error("Erro de conexão:", err));
+      .catch((err) => console.error(err));
   }, [ticketId]);
 
   useEffect(() => {
@@ -52,14 +109,23 @@ export default function TicketEmailThread({ ticketId }: { ticketId: number }) {
   }, [loadTicket]);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (isReplying && editorRef.current) {
+      editorRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [ticket?.messages]);
+  }, [isReplying]);
+
+  const toggleMessage = (messageId: string) => {
+    setExpandedMessages((prev) => ({
+      ...prev,
+      [messageId]: !prev[messageId],
+    }));
+  };
 
   async function sendReply() {
-    if (!reply.trim()) return;
+    if (!reply.trim() || !ticket) return;
     setSending(true);
+
+    const recipientsToSend = ticket.recipients || [];
 
     try {
       await fetch(`http://localhost:5000/ticket/add/message/${ticketId}`, {
@@ -68,194 +134,313 @@ export default function TicketEmailThread({ ticketId }: { ticketId: number }) {
         body: JSON.stringify({
           content: reply,
           notifyClient: true,
-          recipients: ticket.recipients,
-          subject: ticket.subject,
+          recipients: recipientsToSend,
         }),
       });
       setReply("");
+      setIsReplying(false);
       loadTicket();
     } finally {
       setSending(false);
     }
   }
 
-  if (ticket === null) {
+  if (!ticket) {
     return (
-      <div className="p-8 text-center text-gray-500">
-        Carregando conversa...
+      <div className="p-10">
+        <Skeleton className="h-40 w-full" />
       </div>
     );
   }
 
-  const handleClick = () => {
-    router.replace("/");
-  };
-
   return (
-    <div className="flex flex-col h-screen max-h-200 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-      <div className="bg-gray-50 border-b p-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 mb-1">
-              {ticket.subject}{" "}
-              <span className="text-gray-400 font-normal">#{ticket.id}</span>
-            </h1>
-            <div className="text-sm text-gray-500">
-              Solicitante:{" "}
-              <span className="font-medium text-gray-700">
-                {ticket.requesterEmail}
-              </span>
-            </div>
-          </div>
-          <div>
-            <LogOut className="cursor-pointer" onClick={() => handleClick()} />
-          </div>
-        </div>
+    <div className="flex flex-col h-full bg-[#f0f2f5] font-sans text-sm">
+      <div className="bg-white px-5 py-4 border-b border-gray-200 sticky top-0 z-10 shadow-sm flex items-center justify-between">
+        <h1 className="text-lg font-semibold text-gray-800 truncate">
+          {ticket.subject.includes("[Ticket")
+            ? ticket.subject
+            : `[Ticket #${ticket.id}] ${ticket.subject}`}
+        </h1>
       </div>
 
-      <div
-        className="flex-1 overflow-y-auto p-6 space-y-8 bg-white scroll-smooth"
-        ref={scrollRef}
-      >
-        {ticket.messages.map((msg: any) => {
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Bloco de Resposta / Botões */}
+        <div className="bg-white border border-gray-200 rounded-md shadow-sm p-1">
+          {!isReplying ? (
+            <div className="flex items-center gap-1 p-1">
+              <Button
+                variant="ghost"
+                className="h-10 text-gray-600 hover:bg-gray-100 text-sm gap-2 px-4 justify-start flex-1 sm:flex-none border border-transparent hover:border-gray-200"
+                onClick={() => setIsReplying(true)}
+              >
+                <Reply className="w-4 h-4 text-[#005a9e]" /> Responder
+              </Button>
+              <Button
+                variant="ghost"
+                className="h-10 text-gray-600 hover:bg-gray-100 text-sm gap-2 px-4 justify-start flex-1 sm:flex-none border border-transparent hover:border-gray-200"
+                onClick={() => setIsReplying(true)}
+              >
+                <ReplyAll className="w-4 h-4 text-[#005a9e]" /> Responder a
+                todos
+              </Button>
+            </div>
+          ) : (
+            <div
+              ref={editorRef}
+              className="animate-in fade-in zoom-in-95 duration-200"
+            >
+              <div className="flex gap-1 p-2 border-b border-gray-100 justify-between items-center bg-gray-50/50">
+                <span className="text-xs font-semibold text-gray-500 pl-2">
+                  Respondendo para:{" "}
+                  <span className="text-[#005a9e]">
+                    {ticket.requesterEmail}
+                  </span>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                  onClick={() => setIsReplying(false)}
+                  title="Descartar rascunho"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="flex gap-1 p-2 bg-white border-b border-gray-100">
+                <Button variant="ghost" size="icon" className="h-7 w-7">
+                  <Bold className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7">
+                  <Italic className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7">
+                  <Underline className="w-4 h-4" />
+                </Button>
+                <div className="w-px h-5 bg-gray-300 mx-1 self-center" />
+                <Button variant="ghost" size="icon" className="h-7 w-7">
+                  <ImageIcon className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7">
+                  <Paperclip className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <textarea
+                className="w-full min-h-40 p-4 text-sm outline-none resize-none bg-white"
+                placeholder="Escreva sua resposta..."
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                autoFocus
+              />
+
+              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-b-md border-t border-gray-100">
+                <div className="flex gap-3 items-center">
+                  <Button
+                    onClick={sendReply}
+                    disabled={sending || !reply.trim()}
+                    className="bg-[#005a9e] hover:bg-[#004578] text-white px-6 h-8 text-sm shadow-sm"
+                  >
+                    {sending ? "Enviando..." : "Enviar"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setIsReplying(false)}
+                    className="h-8 text-sm text-gray-600 hover:text-gray-900"
+                  >
+                    Descartar
+                  </Button>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-gray-500"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {ticket.messages.map((msg, index) => {
           const isAgent = msg.direction === "OUT";
           const senderName = isAgent
             ? "Suporte Técnico"
-            : ticket.requesterEmail.split("@")[0];
-          const senderEmail = isAgent
-            ? "suporte@empresa.com"
             : ticket.requesterEmail;
 
+          const isExpanded =
+            expandedMessages[msg.id] ||
+            (Object.keys(expandedMessages).length === 0 && index === 0);
+
+          const avatarBg = isAgent ? "bg-orange-100" : "bg-blue-100";
+          const avatarText = isAgent ? "text-orange-700" : "text-blue-700";
+          const borderColor = isAgent
+            ? "border-l-orange-500"
+            : "border-l-[#005a9e]";
+          const nameColor = isAgent ? "text-orange-700" : "text-[#005a9e]";
+          const headerBg = isExpanded
+            ? isAgent
+              ? "bg-orange-50/30"
+              : "bg-blue-50/30"
+            : "bg-white";
+
           return (
-            <div key={msg.id} className="group">
-              <div className="flex items-center gap-3 mb-3">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-sm ${
-                    isAgent
-                      ? "bg-blue-600 text-white"
-                      : "bg-orange-500 text-white"
-                  }`}
+            <div
+              key={msg.id}
+              className={`bg-white border border-gray-200 shadow-sm transition-all duration-200 ease-in-out ${
+                isExpanded
+                  ? `rounded-sm border-l-4 ${borderColor}`
+                  : "rounded-md cursor-pointer hover:bg-gray-50"
+              }`}
+              onClick={() => !isExpanded && toggleMessage(msg.id)}
+            >
+              <div
+                className={`px-4 py-3 flex items-start gap-3 ${
+                  !isExpanded ? "h-14 overflow-hidden" : ""
+                } ${headerBg}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleMessage(msg.id);
+                }}
+              >
+                <Avatar
+                  className={`${
+                    isExpanded ? "w-10 h-10" : "w-8 h-8"
+                  } ${avatarBg} ${avatarText} border border-gray-100 transition-all`}
                 >
-                  {getInitials(isAgent ? "Suporte" : ticket.requesterEmail)}
-                </div>
-                <div className="flex-1">
-                  <div className="flex justify-between items-baseline">
-                    <h3 className="text-sm font-bold text-gray-900">
-                      {senderName}
-                      <span className="text-gray-400 font-normal text-xs ml-2">
-                        &lt;{senderEmail}&gt;
+                  <AvatarFallback className="font-bold text-xs">
+                    {getInitials(senderName)}
+                  </AvatarFallback>
+                </Avatar>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <span
+                        className={`font-semibold ${nameColor} truncate ${
+                          !isExpanded ? "text-sm" : "text-[15px]"
+                        }`}
+                      >
+                        {senderName}
                       </span>
-                    </h3>
-                    <span className="text-xs text-gray-400 font-medium">
-                      {formatEmailDate(msg.createdAt)}
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    Para: {isAgent ? ticket.requesterEmail : "Suporte Técnico"}
-                  </div>
-                </div>
-              </div>
+                      {isAgent && isExpanded && (
+                        <span className="text-[10px] uppercase font-bold bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded">
+                          Staff
+                        </span>
+                      )}
 
-              <div className="ml-14 text-sm text-gray-800 leading-relaxed border-l-2 border-transparent group-hover:border-gray-200 pl-2 transition-colors">
-                <p className="whitespace-pre-wrap font-sans">{msg.content}</p>
+                      {!isExpanded && (
+                        <span className="text-gray-500 text-xs truncate max-w-75 hidden sm:block">
+                          - {msg.content.substring(0, 60).replace(/\n/g, " ")}
+                          ...
+                        </span>
+                      )}
+                    </div>
 
-                {msg.attachments && msg.attachments.length > 0 && (
-                  <div className="mt-6 border-t pt-4">
-                    <p className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">
-                      {msg.attachments.length} Anexo(s)
-                    </p>
-                    <div className="flex flex-wrap gap-3">
-                      {msg.attachments.map((att: Attachment) => (
-                        <div
-                          key={att.id}
-                          className="border rounded-md p-2 bg-gray-50 flex items-center gap-3 min-w-5 hover:bg-gray-100 transition"
-                        >
-                          <div className="bg-gray-200 p-2 rounded">
-                            <svg
-                              className="w-6 h-6 text-gray-500"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                              />
-                            </svg>
+                    <div className="flex items-center gap-2 text-gray-500 text-xs whitespace-nowrap">
+                      {isExpanded && (
+                        <div className="text-xs text-gray-500 mt-0.5 flex flex-col gap-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                          <div className="flex gap-1">
+                            <span>Para:</span>
+                            <span className="bg-gray-100 px-1 rounded text-gray-600">
+                              {isAgent ? ticket.requesterEmail : "Suporte"}
+                            </span>
                           </div>
-                          <div className="flex-1 overflow-hidden">
-                            <p className="text-xs font-medium truncate text-gray-700">
-                              {att.filename}
-                            </p>
-                            <div className="flex gap-2 mt-0.5">
-                              <a
-                                href={`data:${att.mimeType};base64,${att.data}`}
-                                download={att.filename}
-                                className="text-[10px] text-blue-600 font-bold hover:underline"
-                              >
-                                Baixar
-                              </a>
-                            </div>
-                          </div>
-                          {att.mimeType.startsWith("image/") && (
-                            <Image
-                              src={`data:${att.mimeType};base64,${att.data}`}
-                              alt={att.filename || "Anexo"}
-                              width={200}
-                              height={80}
-                              className="object-cover rounded border"
-                              unoptimized
-                            />
-                          )}
+
+                          {ticket.recipients &&
+                            ticket.recipients.length > 0 && (
+                              <div className="flex gap-1">
+                                <span>Cc:</span>
+                                <span className="text-gray-500 truncate max-w-xs">
+                                  {ticket.recipients.join(", ")}
+                                </span>
+                              </div>
+                            )}
                         </div>
-                      ))}
+                      )}
+                      <span>{formatOutlookDate(msg.createdAt)}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 ml-1 text-gray-400"
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                      </Button>
                     </div>
                   </div>
-                )}
+
+                  {isExpanded && (
+                    <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <span>Para:</span>
+                      <span className="bg-gray-100 px-1 rounded text-gray-600">
+                        {isAgent ? ticket.requesterEmail : "Você"}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="border-b border-gray-100 my-6 ml-14"></div>
+              {isExpanded && (
+                <div className="animate-in fade-in duration-300">
+                  <div className="px-4 py-4 pl-17 text-gray-800 text-[15px] leading-relaxed whitespace-pre-wrap font-sans border-t border-transparent">
+                    {msg.content}
+                  </div>
+
+                  {msg.attachments && msg.attachments.length > 0 && (
+                    <div className="px-4 pb-4 pl-17">
+                      <div className="border-t border-gray-100 pt-3">
+                        <div className="flex flex-col gap-4 mb-4">
+                          {msg.attachments
+                            .filter((att) => att.mimeType.startsWith("image/"))
+                            .map((att) => (
+                              <div
+                                key={att.id}
+                                className="max-w-md border rounded-lg overflow-hidden shadow-sm"
+                              >
+                                <Image
+                                  src={`data:${att.mimeType};base64,${att.data}`}
+                                  alt={att.filename}
+                                  width={0}
+                                  height={0}
+                                  sizes="100vw"
+                                  style={{ width: "100%", height: "auto" }}
+                                  className="object-contain"
+                                />
+                                <div className="bg-gray-50 px-3 py-2 text-xs text-gray-500 border-t">
+                                  {att.filename}
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          {msg.attachments
+                            .filter((att) => !att.mimeType.startsWith("image/"))
+                            .map((att) => (
+                              <div
+                                key={att.id}
+                                className="flex items-center gap-2 bg-white border border-gray-200 px-2 py-1 rounded cursor-pointer hover:bg-gray-50"
+                              >
+                                <Paperclip className="w-3 h-3 text-red-500" />
+                                <span className="text-xs text-blue-600 hover:underline">
+                                  {att.filename}
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
-      </div>
-
-      <div className="p-6 bg-gray-50 border-t">
-        <div className="bg-white border rounded-lg shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
-          <div className="border-b px-3 py-2 bg-gray-50 flex gap-2">
-            <span className="text-xs font-bold text-gray-500">
-              Responder para:
-            </span>
-            <span className="text-xs text-gray-700 bg-gray-200 px-2 rounded">
-              {ticket.requesterEmail}
-            </span>
-          </div>
-          <textarea
-            className="w-full p-4 min-h-25 resize-y outline-none text-sm text-gray-800"
-            placeholder="Escreva sua resposta aqui..."
-            value={reply}
-            onChange={(e) => setReply(e.target.value)}
-            disabled={sending}
-          />
-          <div className="p-3 border-t flex justify-between items-center bg-gray-50 rounded-b-lg">
-            <div className="text-xs text-gray-400 italic">
-              Use Shift + Enter para quebrar linha
-            </div>
-            <button
-              onClick={sendReply}
-              disabled={sending || !reply.trim()}
-              className={`px-6 py-2 rounded-md text-sm font-bold shadow-sm transition-all ${
-                sending || !reply.trim()
-                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  : "bg-blue-600 text-white hover:bg-blue-700 hover:shadow"
-              }`}
-            >
-              {sending ? "Enviando..." : "Enviar Resposta"}
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

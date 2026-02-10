@@ -8,8 +8,5 @@ export class CreateTicketDTO {
   content: string;
 
   @IsEmail()
-  requesterEmail: string;
-
-  @IsEmail({}, { each: true })
-  recipients: string[];
+  recipients: string;
 }

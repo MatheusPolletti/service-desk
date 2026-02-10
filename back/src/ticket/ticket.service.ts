@@ -17,7 +17,6 @@ export class TicketService {
     const ticket = await this.prisma.ticket.update({
       where: { id: ticketId },
       data: {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         status: status,
         updatedAt: new Date(),
       },
@@ -73,14 +72,13 @@ export class TicketService {
 
   async createTicket(dto: CreateTicketDTO) {
     const rootMessageId = `<ticket-${randomUUID()}@proit.com.br>`;
+    const email = 'matheus.c.polletti@gmail.com';
 
     const ticket = await this.prisma.ticket.create({
       data: {
         subject: dto.subject,
-        requesterEmail: dto.requesterEmail,
-        recipients: Array.isArray(dto.recipients)
-          ? dto.recipients
-          : [dto.recipients],
+        requesterEmail: dto.recipients,
+        recipients: [email],
         originalMessageId: rootMessageId,
         messages: {
           create: {
@@ -100,8 +98,8 @@ export class TicketService {
       .replace(/ {2}/g, ' &nbsp;');
 
     await this.emailService.sendTicketEmail({
-      from: dto.requesterEmail,
-      to: dto.recipients,
+      from: email,
+      to: [dto.recipients],
       ticketId: ticket.id,
       ticketSubject: ticket.subject,
       currentMessageId: rootMessageId,
@@ -132,15 +130,18 @@ export class TicketService {
     const newMessageId = `<reply-${randomUUID()}@seudominio.com.br>`;
     const lastMessageId =
       ticket.messages[0]?.messageId || ticket.originalMessageId;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    let newStatus = ticket.status;
 
-    if (dto.status) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      newStatus = dto.status;
-    } else if (dto.notifyClient && ticket.status === 'OPEN') {
-      newStatus = 'PENDING';
-    }
+    const existingRecipients = ticket.recipients || [];
+
+    const newRecipients = dto.recipients || [];
+
+    const uniqueRecipients = [
+      ...new Set([...existingRecipients, ...newRecipients]),
+    ];
+
+    const finalRecipientsList = uniqueRecipients.filter(
+      (email) => email !== ticket.requesterEmail,
+    );
 
     const result = await this.prisma.$transaction(async (tx) => {
       const message = await tx.message.create({
@@ -155,9 +156,11 @@ export class TicketService {
       await tx.ticket.update({
         where: { id: ticket.id },
         data: {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          status: newStatus,
+          status: 'PENDING',
+          slaDueDate: null,
+          slaStatus: 'OK',
           updatedAt: new Date(),
+          recipients: finalRecipientsList,
         },
       });
 
@@ -167,9 +170,11 @@ export class TicketService {
     if (dto.notifyClient) {
       const emailSubject = `[Ticket #${ticket.id}] ${ticket.subject}`;
 
+      const sendTo = [ticket.requesterEmail, ...finalRecipientsList];
+
       await this.emailService.sendTicketEmail({
-        from: ticket.requesterEmail,
-        to: [ticket.requesterEmail, ...(dto.recipients || [])],
+        from: 'matheus.c.polletti@gmail.com',
+        to: sendTo,
         ticketId: ticket.id,
         currentMessageId: newMessageId,
         references: `${ticket.originalMessageId} ${lastMessageId}`,
@@ -179,29 +184,5 @@ export class TicketService {
     }
 
     return result;
-    // const message = await this.prisma.message.create({
-    //   data: {
-    //     content: dto.content,
-    //     direction: 'OUT',
-    //     messageId: newMessageId,
-    //     ticketId: ticket.id,
-    //   },
-    // });
-
-    // if (dto.notifyClient) {
-    //   const emailSubject = `[Ticket #${ticket.id}] ${ticket.subject}`;
-
-    //   await this.emailService.sendTicketEmail({
-    //     from: ticket.requesterEmail,
-    //     to: [ticket.requesterEmail],
-    //     ticketId: ticket.id,
-    //     currentMessageId: newMessageId,
-    //     references: `${ticket.originalMessageId} ${lastMessageId}`,
-    //     content: dto.content,
-    //     ticketSubject: emailSubject,
-    //   });
-    // }
-
-    // return message;
   }
 }
