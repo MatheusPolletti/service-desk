@@ -201,18 +201,20 @@ export class EmailInboundService {
     await this.prisma.ticket.create({
       data: {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-        subject: email.subject,
+        subject: email.subject || '',
         requesterEmail: sender || 'unknown@example.com',
         recipients: validRecipients,
         originalMessageId: messageId,
         status: 'OPEN',
         slaDueDate: this.getSlaDeadline(),
         slaStatus: 'OK',
+
         messages: {
           create: {
             content: cleanContent,
             direction: 'IN',
             messageId: messageId,
+            senderEmail: sender,
             attachments: {
               // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               create: attachmentsData as any,
@@ -228,6 +230,10 @@ export class EmailInboundService {
     email: ParsedMail,
     messageId: string,
   ): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const sender = (email.from as any)?.value?.[0]?.address as
+      | string
+      | undefined;
     const exists = await this.prisma.message.findUnique({
       where: { messageId },
     });
@@ -249,6 +255,8 @@ export class EmailInboundService {
           direction: 'IN',
           messageId: messageId,
           ticketId: ticketId,
+
+          senderEmail: sender,
           attachments: {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             create: attachmentsData as any,

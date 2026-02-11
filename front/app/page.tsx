@@ -1,8 +1,34 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import ContactForm from "./components/contract-form";
 import Tickets from "./components/tickets";
-import { Ticket, Bell } from "lucide-react";
+import { Ticket, Bell, Loader2 } from "lucide-react";
+
+interface DashboardStats {
+  open: number;
+  pending: number;
+  resolvedToday: number;
+}
 
 export default function Home() {
+  const [stats, setStats] = useState<DashboardStats>({
+    open: 0,
+    pending: 0,
+    resolvedToday: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("http://localhost:5000/ticket/stats")
+      .then((res) => res.json())
+      .then((data) => {
+        setStats(data);
+      })
+      .catch((err) => console.error("Erro ao carregar estatísticas", err))
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
       <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col">
@@ -50,17 +76,17 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <StatCard
                 label="Chamados Abertos"
-                value="12"
+                value={loading ? "-" : stats.open.toString()}
                 color="text-blue-600"
               />
               <StatCard
                 label="Em Andamento"
-                value="5"
+                value={loading ? "-" : stats.pending.toString()}
                 color="text-yellow-600"
               />
               <StatCard
                 label="Resolvidos (Hoje)"
-                value="3"
+                value={loading ? "-" : stats.resolvedToday.toString()}
                 color="text-green-600"
               />
             </div>
@@ -106,7 +132,13 @@ function StatCard({
   return (
     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
       <p className="text-sm text-slate-500 mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+      <div className="flex items-center gap-2">
+        {value === "-" ? (
+          <Loader2 className="h-6 w-6 animate-spin text-gray-300" />
+        ) : (
+          <p className={`text-2xl font-bold ${color}`}>{value}</p>
+        )}
+      </div>
     </div>
   );
 }

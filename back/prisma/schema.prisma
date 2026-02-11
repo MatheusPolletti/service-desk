@@ -40,7 +40,9 @@ model Message {
   content     String
   direction   String
   messageId   String       @unique
+  references  String?      @db.Text
   createdAt   DateTime     @default(now())
+  senderEmail String?
   ticketId    Int
   ticket      Ticket       @relation(fields: [ticketId], references: [id])
   attachments Attachment[]

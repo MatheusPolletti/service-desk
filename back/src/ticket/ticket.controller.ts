@@ -16,6 +16,11 @@ import { UpdateTicketStatusDTO } from './dto/update.ticket.status.dto';
 export class TicketController {
   constructor(private readonly ticketService: TicketService) {}
 
+  @Get('stats')
+  async getStats() {
+    return this.ticketService.getDashboardStats();
+  }
+
   @Patch('status/:id')
   async updateStatus(
     @Param('id', ParseIntPipe) ticketId: number,

@@ -31,6 +31,7 @@ interface Message {
   content: string;
   direction: "IN" | "OUT";
   createdAt: string;
+  senderEmail?: string;
   attachments: Attachment[];
 }
 
@@ -164,7 +165,6 @@ export default function TicketEmailThread({ ticketId }: { ticketId: number }) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Bloco de Resposta / Botões */}
         <div className="bg-white border border-gray-200 rounded-md shadow-sm p-1">
           {!isReplying ? (
             <div className="flex items-center gap-1 p-1">
@@ -265,9 +265,30 @@ export default function TicketEmailThread({ ticketId }: { ticketId: number }) {
 
         {ticket.messages.map((msg, index) => {
           const isAgent = msg.direction === "OUT";
-          const senderName = isAgent
+
+          const currentSenderEmail = isAgent
             ? "Suporte Técnico"
-            : ticket.requesterEmail;
+            : msg.senderEmail || ticket.requesterEmail;
+
+          const senderDisplayName = currentSenderEmail;
+
+          let displayRecipients = [...(ticket.recipients || [])];
+
+          if (
+            !isAgent &&
+            msg.senderEmail &&
+            msg.senderEmail !== ticket.requesterEmail
+          ) {
+            if (!displayRecipients.includes(ticket.requesterEmail)) {
+              displayRecipients.push(ticket.requesterEmail);
+            }
+          }
+
+          if (!isAgent) {
+            displayRecipients = displayRecipients.filter(
+              (email) => email !== currentSenderEmail,
+            );
+          }
 
           const isExpanded =
             expandedMessages[msg.id] ||
@@ -310,7 +331,7 @@ export default function TicketEmailThread({ ticketId }: { ticketId: number }) {
                   } ${avatarBg} ${avatarText} border border-gray-100 transition-all`}
                 >
                   <AvatarFallback className="font-bold text-xs">
-                    {getInitials(senderName)}
+                    {getInitials(senderDisplayName)}
                   </AvatarFallback>
                 </Avatar>
 
@@ -322,7 +343,7 @@ export default function TicketEmailThread({ ticketId }: { ticketId: number }) {
                           !isExpanded ? "text-sm" : "text-[15px]"
                         }`}
                       >
-                        {senderName}
+                        {senderDisplayName}
                       </span>
                       {isAgent && isExpanded && (
                         <span className="text-[10px] uppercase font-bold bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded">
@@ -348,15 +369,15 @@ export default function TicketEmailThread({ ticketId }: { ticketId: number }) {
                             </span>
                           </div>
 
-                          {ticket.recipients &&
-                            ticket.recipients.length > 0 && (
-                              <div className="flex gap-1">
-                                <span>Cc:</span>
-                                <span className="text-gray-500 truncate max-w-xs">
-                                  {ticket.recipients.join(", ")}
-                                </span>
-                              </div>
-                            )}
+                          {/* AQUI USAMOS A LISTA CORRIGIDA (displayRecipients) */}
+                          {displayRecipients.length > 0 && (
+                            <div className="flex gap-1">
+                              <span>Cc:</span>
+                              <span className="text-gray-500 truncate max-w-xs">
+                                {displayRecipients.join(", ")}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
                       <span>{formatOutlookDate(msg.createdAt)}</span>
@@ -390,7 +411,6 @@ export default function TicketEmailThread({ ticketId }: { ticketId: number }) {
                   <div className="px-4 py-4 pl-17 text-gray-800 text-[15px] leading-relaxed whitespace-pre-wrap font-sans border-t border-transparent">
                     {msg.content}
                   </div>
-
                   {msg.attachments && msg.attachments.length > 0 && (
                     <div className="px-4 pb-4 pl-17">
                       <div className="border-t border-gray-100 pt-3">

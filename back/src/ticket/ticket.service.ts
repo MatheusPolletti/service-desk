@@ -13,6 +13,38 @@ export class TicketService {
     private readonly prisma: PrismaService,
   ) {}
 
+  async getDashboardStats() {
+    const statusCounts = await this.prisma.ticket.groupBy({
+      by: ['status'],
+      _count: {
+        id: true,
+      },
+    });
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const resolvedToday = await this.prisma.ticket.count({
+      where: {
+        status: { in: ['RESOLVED', 'CLOSED'] },
+        updatedAt: {
+          gte: startOfToday,
+        },
+      },
+    });
+
+    const openCount =
+      statusCounts.find((s) => s.status === 'OPEN')?._count.id || 0;
+    const pendingCount =
+      statusCounts.find((s) => s.status === 'PENDING')?._count.id || 0;
+
+    return {
+      open: openCount,
+      pending: pendingCount,
+      resolvedToday: resolvedToday,
+    };
+  }
+
   async updateStatus(ticketId: number, status: TicketStatus) {
     const ticket = await this.prisma.ticket.update({
       where: { id: ticketId },
