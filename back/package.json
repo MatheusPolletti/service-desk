@@ -32,8 +32,10 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
     "dotenv": "^17.2.4",
+    "email-reply-parser": "^2.3.5",
     "imap-simple": "^5.1.0",
     "mailparser": "^3.9.3",
+    "node-email-reply-parser": "^0.1.4",
     "pg": "^8.18.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"

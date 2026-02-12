@@ -26,6 +26,9 @@ export class EmailService {
 
     const tag = `[Ticket #${ticketId}]`;
 
+    console.log('id mensagem', currentMessageId);
+    console.log('references', references);
+
     const finalSubject = ticketSubject.includes(tag)
       ? ticketSubject
       : `${tag} ${ticketSubject}`;

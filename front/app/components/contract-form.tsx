@@ -72,7 +72,7 @@ export default function ContactForm() {
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="grid gap-2">
             <Label htmlFor="recipients" className="text-slate-700">
-              Seu E-mail (Solicitante)
+              E-mail (Solicitante)
             </Label>
             <Input
               id="recipients"

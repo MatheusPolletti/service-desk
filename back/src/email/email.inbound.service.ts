@@ -7,6 +7,7 @@ import { ImapConfig } from './interface/imap-config';
 import { ImapConnection } from './interface/imap-connection';
 import { ImapMessage } from './interface/imap-message';
 import { AttachmentData } from './interface/attachment-data';
+import EmailReplyParser from 'email-reply-parser';
 
 @Injectable()
 export class EmailInboundService {
@@ -16,9 +17,7 @@ export class EmailInboundService {
 
   private getSlaDeadline(): Date {
     const deadline = new Date();
-
     deadline.setHours(deadline.getHours() + 4);
-
     return deadline;
   }
 
@@ -27,41 +26,81 @@ export class EmailInboundService {
 
     const separators = [
       /_{30,}/,
-      /De:\s.*<.+@.+>/i,
-      /From:\s.*<.+@.+>/i,
-      /Em\s.*escreveu:/i,
-      /On\s.*wrote:/i,
+      /From:\s.*(?:\r?\n|\r)Sent:\s.*/i,
+      /From:\s.*(?:\r?\n|\r)Date:\s.*/i,
+      /De:\s.*(?:\r?\n|\r)Enviado (?:em|por):\s.*/i,
+      /De:\s.*(?:\r?\n|\r)Data:\s.*/i,
+      /On\s.+wrote:/i,
+      /Em\s.+escreveu:/i,
+      /Em\s.+transcreveu:/i,
       /-{5,}Original Message-{5,}/i,
+      /-{5,}Mensagem Original-{5,}/i,
+      /Enviado do meu iPhone/i,
+      /Enviado do meu Android/i,
+      /Sent from my iPhone/i,
+      /Get Outlook for/i,
     ];
 
     const lines = text.split('\n');
     const outputLines: string[] = [];
+    let isQuotedBlock = false;
 
     for (const line of lines) {
       const isSeparator = separators.some((regex) => regex.test(line));
-      if (isSeparator) break;
 
-      outputLines.push(line);
+      if (isSeparator) {
+        isQuotedBlock = true;
+        break;
+      }
+
+      if (!isQuotedBlock) {
+        outputLines.push(line);
+      }
     }
 
-    const cleanText = outputLines.join('\n');
-
-    return cleanText.trim();
+    return outputLines
+      .join('\n')
+      .replace(/\[cid:[^\]]*\]/g, '')
+      .trim();
   }
 
-  private extractAttachments(email: ParsedMail): AttachmentData[] {
+  private parseEmailParts(text: string) {
+    if (!text) return { visible: '', hidden: '', full: '' };
+
+    const emailReplyParser = new EmailReplyParser();
+    const visible = emailReplyParser.parseReply(text).trim();
+
+    let hidden = text.replace(visible, '').trim();
+
+    hidden = hidden.replace(/^\s*[\r\n]+/, '');
+
+    return { visible, hidden, full: text };
+  }
+
+  private extractAttachments(
+    email: ParsedMail,
+    fullContent: string,
+  ): AttachmentData[] {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
     const attachments = (email.attachments as any) ?? [];
-    return Array.isArray(attachments)
-      ? attachments.map((att: any) => ({
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          filename: (att.filename as string) || 'arquivo',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          mimeType: (att.contentType as string) || 'application/octet-stream',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          data: (att.content as Buffer).toString('base64'),
-        }))
-      : [];
+    if (!Array.isArray(attachments)) return [];
+
+    return attachments
+      .filter((att: any) => {
+        const isInline = att.contentDisposition === 'inline' || att.related;
+        if (!isInline) return true;
+
+        const cid = att.contentId ? att.contentId.replace(/[<>]/g, '') : null;
+        if (!cid) return true;
+
+        return fullContent.includes(cid);
+      })
+      .map((att: any) => ({
+        // ... mapeamento igual ao anterior
+        filename: (att.filename as string) || `anexo-${Date.now()}`,
+        mimeType: (att.contentType as string) || 'application/octet-stream',
+        data: (att.content as Buffer).toString('base64'),
+      }));
   }
 
   async checkInbox(): Promise<void> {
@@ -72,14 +111,12 @@ export class EmailInboundService {
         host: process.env.IMAP_HOST,
         port: Number(process.env.IMAP_PORT),
         tls: true,
-        tlsOptions: {
-          rejectUnauthorized: false,
-        },
+        tlsOptions: { rejectUnauthorized: false },
         authTimeout: 5000,
       },
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     const connection = (await imaps.connect(
       config,
     )) as unknown as ImapConnection;
@@ -174,6 +211,7 @@ export class EmailInboundService {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       (email.html as string | undefined) ||
       '';
+
     const cleanContent = this.cleanEmailContent(rawContent);
 
     const extractEmails = (field: any): string[] => {
@@ -189,20 +227,18 @@ export class EmailInboundService {
     const ccAddresses = extractEmails((email.cc as any) ?? null);
 
     const allRecipients = [...new Set([...toAddresses, ...ccAddresses])];
-
     const systemEmail = process.env.EMAIL_USER;
-
     const validRecipients = allRecipients.filter(
       (addr) => addr !== sender && addr !== systemEmail,
     );
 
-    const attachmentsData = this.extractAttachments(email);
+    const attachmentsData = this.extractAttachments(email, cleanContent);
 
     await this.prisma.ticket.create({
       data: {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
         subject: email.subject || '',
-        requesterEmail: sender || 'unknown@example.com',
+        requesterEmail: sender || '',
         recipients: validRecipients,
         originalMessageId: messageId,
         status: 'OPEN',
@@ -234,28 +270,46 @@ export class EmailInboundService {
     const sender = (email.from as any)?.value?.[0]?.address as
       | string
       | undefined;
+
     const exists = await this.prisma.message.findUnique({
       where: { messageId },
     });
     if (exists) return;
 
-    const rawContent =
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      (email.text as string | undefined) ||
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      (email.html as string | undefined) ||
-      '';
-    const cleanContent = this.cleanEmailContent(rawContent);
-    const attachmentsData = this.extractAttachments(email);
+    const rawContent = (email.text || email.html || '') as string;
+
+    console.log(rawContent);
+
+    const { visible, hidden } = this.parseEmailParts(rawContent);
+
+    const attachmentsData = this.extractAttachments(email, visible);
+
+    const DB_DELIMITER = '\n\n<---HISTORY-SEPARATOR--->\n\n';
+
+    const cleanVisible = visible.replace(/\[cid:[^\]]*\]/g, '');
+
+    const finalContentToSave = hidden
+      ? `${cleanVisible}${DB_DELIMITER}${hidden}`
+      : cleanVisible;
+
+    console.log('data', {
+      content: finalContentToSave,
+      direction: 'IN',
+      messageId: messageId,
+      ticketId: ticketId,
+      senderEmail: sender,
+      attachments: {
+        create: attachmentsData as any,
+      },
+    });
 
     await this.prisma.$transaction([
       this.prisma.message.create({
         data: {
-          content: cleanContent,
+          content: finalContentToSave,
           direction: 'IN',
           messageId: messageId,
           ticketId: ticketId,
-
           senderEmail: sender,
           attachments: {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -264,7 +318,9 @@ export class EmailInboundService {
         },
       }),
       this.prisma.ticket.update({
-        where: { id: ticketId },
+        where: {
+          id: ticketId,
+        },
         data: {
           updatedAt: new Date(),
           status: 'OPEN',

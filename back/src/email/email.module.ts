@@ -21,7 +21,6 @@ import { PrismaService } from 'prisma/prisma.service';
           secure: true,
           auth: {
             user: config.get<string>('EMAIL_USER'),
-
             pass: config.get<string>('EMAIL_PASSWORD'),
           },
         },

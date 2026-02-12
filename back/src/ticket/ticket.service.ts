@@ -159,7 +159,7 @@ export class TicketService {
 
     if (!ticket) throw new NotFoundException('Ticket não encontrado');
 
-    const newMessageId = `<reply-${randomUUID()}@seudominio.com.br>`;
+    const newMessageId = `<reply-${randomUUID()}@proit.com.br>`;
     const lastMessageId =
       ticket.messages[0]?.messageId || ticket.originalMessageId;
 

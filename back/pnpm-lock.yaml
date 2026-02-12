@@ -44,12 +44,18 @@ importers:
       dotenv:
         specifier: ^17.2.4
         version: 17.2.4
+      email-reply-parser:
+        specifier: ^2.3.5
+        version: 2.3.5
       imap-simple:
         specifier: ^5.1.0
         version: 5.1.0
       mailparser:
         specifier: ^3.9.3
         version: 3.9.3
+      node-email-reply-parser:
+        specifier: ^0.1.4
+        version: 0.1.4
       pg:
         specifier: ^8.18.0
         version: 8.18.0
@@ -1946,6 +1952,15 @@ packages:
   electron-to-chromium@1.5.286:
     resolution: {integrity: sha512-9tfDXhJ4RKFNerfjdCcZfufu49vg620741MNs26a9+bhLThdB+plgMeou98CAaHu/WATj2iHOOHTp1hWtABj2A==}
 
+  email-reply-parser@2.3.5:
+    resolution: {integrity: sha512-0giLt6y7TKHrd+X1jxblFiDqGeeQmXalGLBkqjyBBl9O0gT19r2da2zMqNa1wHs3uoMZVesjNPny8+g0YtI5fw==}
+    engines: {node: '>= 20.0.0'}
+    peerDependencies:
+      re2: 1.22.1
+    peerDependenciesMeta:
+      re2:
+        optional: true
+
   emittery@0.13.1:
     resolution: {integrity: sha512-DeWwawk6r5yR9jFgnDKYt4sLS0LmHJJi3ZOnb5/JdbYwj3nW+FxQnHIjhBKz8YLC7oRNPVM9NQ47I3CVx34eqQ==}
     engines: {node: '>=12'}
@@ -2095,6 +2110,10 @@ packages:
   esrecurse@4.3.0:
     resolution: {integrity: sha512-KmfKL3b6G+RXvP8N1vr3Tq1kL/oCFgn2NYXEtqP8/L3pKapUA4G8cFVaoF3SU323CD4XypR/ffioHmkti6/Tag==}
     engines: {node: '>=4.0'}
+
+  esrever@0.2.0:
+    resolution: {integrity: sha512-1e9YJt6yQkyekt2BUjTky7LZWWVyC2cIpgdnsTAvMcnzXIZvlW/fTMPkxBcZoYhgih4d+EC+iw+yv9GIkz7vrw==}
+    hasBin: true
 
   estraverse@1.9.3:
     resolution: {integrity: sha512-25w1fMXQrGdoquWnScXZGckOv+Wes+JDnuN/+7ex3SauFRS72r2lFDec0EKPt2YD1wUJ/IrfEex+9yp4hfSOJA==}
@@ -3133,6 +3152,10 @@ packages:
 
   node-abort-controller@3.1.1:
     resolution: {integrity: sha512-AGK2yQKIjRuqnc6VkX2Xj5d+QW8xZ87pa1UK6yA6ouUyuxfHuMP6umE5QK7UmTeOAymo+Zx1Fxiuw9rVx8taHQ==}
+
+  node-email-reply-parser@0.1.4:
+    resolution: {integrity: sha512-rXiLvb9J8RRNYEf/Ftf2vx+HEjZjB16ONY5Qd9PAFdN0OESkgvGINbtlgIvdIjVeZ1jPPoK/b90sx+lP1CIvqA==}
+    engines: {node: '>= 14.0.0'}
 
   node-emoji@1.11.0:
     resolution: {integrity: sha512-wo2DpQkQp7Sjm2A0cq+sN7EHKO6Sl0ctXeBdFZrL9T9+UywORbufTcTZxom8YqpLQt/FqNMUkOpkZrJVYSKD3A==}
@@ -6316,6 +6339,8 @@ snapshots:
 
   electron-to-chromium@1.5.286: {}
 
+  email-reply-parser@2.3.5: {}
+
   emittery@0.13.1: {}
 
   emoji-regex@8.0.0: {}
@@ -6463,6 +6488,8 @@ snapshots:
   esrecurse@4.3.0:
     dependencies:
       estraverse: 5.3.0
+
+  esrever@0.2.0: {}
 
   estraverse@1.9.3:
     optional: true
@@ -7986,6 +8013,11 @@ snapshots:
     optional: true
 
   node-abort-controller@3.1.1: {}
+
+  node-email-reply-parser@0.1.4:
+    dependencies:
+      esrever: 0.2.0
+      lodash: 4.17.23
 
   node-emoji@1.11.0:
     dependencies:
