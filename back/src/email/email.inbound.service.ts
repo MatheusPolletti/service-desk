@@ -96,7 +96,6 @@ export class EmailInboundService {
         return fullContent.includes(cid);
       })
       .map((att: any) => ({
-        // ... mapeamento igual ao anterior
         filename: (att.filename as string) || `anexo-${Date.now()}`,
         mimeType: (att.contentType as string) || 'application/octet-stream',
         data: (att.content as Buffer).toString('base64'),
@@ -188,7 +187,7 @@ export class EmailInboundService {
     }
 
     if (ticketId) {
-      await this.addReplyToTicket(ticketId, email, messageId);
+      await this.addReplyToTicket(ticketId, email, messageId, references);
       this.logger.log(`Resposta processada para o Ticket #${ticketId}`);
     } else {
       await this.createNewTicket(email, messageId);
@@ -265,6 +264,7 @@ export class EmailInboundService {
     ticketId: number,
     email: ParsedMail,
     messageId: string,
+    references: string[],
   ): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const sender = (email.from as any)?.value?.[0]?.address as
@@ -303,6 +303,8 @@ export class EmailInboundService {
       },
     });
 
+    const referencesString = references.join(' ');
+
     await this.prisma.$transaction([
       this.prisma.message.create({
         data: {
@@ -311,6 +313,7 @@ export class EmailInboundService {
           messageId: messageId,
           ticketId: ticketId,
           senderEmail: sender,
+          references: referencesString,
           attachments: {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             create: attachmentsData as any,

@@ -1,5 +1,5 @@
-import TicketChat from "@/app/components/ticket-chat"; // Seu componente de chat atual
-import TicketSidebar from "@/app/components/ticket-sidebar"; // O novo componente acima
+import TicketChat from "@/app/components/ticket-chat";
+import TicketSidebar from "@/app/components/ticket-sidebar";
 
 export default async function TicketPage({
   params,

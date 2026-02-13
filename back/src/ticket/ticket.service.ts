@@ -135,6 +135,7 @@ export class TicketService {
       ticketId: ticket.id,
       ticketSubject: ticket.subject,
       currentMessageId: rootMessageId,
+      inReplyTo: rootMessageId,
       references: rootMessageId,
       content: contentHtml,
     });
@@ -143,6 +144,8 @@ export class TicketService {
   }
 
   async addMessage(ticketId: number, dto: AddTicketMessageDTO) {
+    console.log('oi');
+    console.log(ticketId);
     const ticket = await this.prisma.ticket.findUnique({
       where: {
         id: ticketId,
@@ -157,20 +160,69 @@ export class TicketService {
       },
     });
 
+    console.log(ticket);
+
     if (!ticket) throw new NotFoundException('Ticket não encontrado');
 
     const newMessageId = `<reply-${randomUUID()}@proit.com.br>`;
-    const lastMessageId =
-      ticket.messages[0]?.messageId || ticket.originalMessageId;
 
+    console.log(newMessageId);
+
+    let parentMessage: {
+      messageId: string;
+      references: string | null;
+    } | null = null;
+
+    if (dto.parentMessageId) {
+      parentMessage = await this.prisma.message.findUnique({
+        where: { id: dto.parentMessageId },
+        select: { messageId: true, references: true },
+      });
+    }
+
+    if (!parentMessage) {
+      const lastMsg = ticket.messages[0];
+      if (lastMsg) {
+        parentMessage = {
+          messageId: lastMsg.messageId,
+          references: lastMsg.references,
+        };
+      } else {
+        parentMessage = {
+          messageId: ticket.originalMessageId,
+          references: null,
+        };
+      }
+    }
+
+    const parentMessageIdHeader = parentMessage.messageId;
+
+    let referencesHeader = '';
+
+    const parentRefs = parentMessage.references
+      ? parentMessage.references.trim()
+      : '';
+    const parentMsgId = parentMessage.messageId.trim();
+
+    if (parentRefs) {
+      referencesHeader = `${parentRefs} ${parentMsgId}`;
+    } else {
+      if (parentMsgId === ticket.originalMessageId) {
+        referencesHeader = ticket.originalMessageId;
+      } else {
+        referencesHeader = `${ticket.originalMessageId} ${parentMsgId}`;
+      }
+    }
+
+    const uniqueRefs = [...new Set(referencesHeader.split(/\s+/))].filter(
+      Boolean,
+    );
+    referencesHeader = uniqueRefs.join(' ');
     const existingRecipients = ticket.recipients || [];
-
     const newRecipients = dto.recipients || [];
-
     const uniqueRecipients = [
       ...new Set([...existingRecipients, ...newRecipients]),
     ];
-
     const finalRecipientsList = uniqueRecipients.filter(
       (email) => email !== ticket.requesterEmail,
     );
@@ -181,12 +233,17 @@ export class TicketService {
           content: dto.content,
           direction: 'OUT',
           messageId: newMessageId,
+          references: referencesHeader,
           ticketId: ticket.id,
         },
       });
 
+      console.log(message);
+
       await tx.ticket.update({
-        where: { id: ticket.id },
+        where: {
+          id: ticket.id,
+        },
         data: {
           status: 'PENDING',
           slaDueDate: null,
@@ -199,17 +256,30 @@ export class TicketService {
       return message;
     });
 
+    console.log(result);
+
     if (dto.notifyClient) {
       const emailSubject = `[Ticket #${ticket.id}] ${ticket.subject}`;
-
       const sendTo = [ticket.requesterEmail, ...finalRecipientsList];
+
+      console.log({
+        from: 'matheus.c.polletti@gmail.com',
+        to: sendTo,
+        ticketId: ticket.id,
+        currentMessageId: newMessageId,
+        inReplyTo: parentMessageIdHeader,
+        references: referencesHeader,
+        content: dto.content,
+        ticketSubject: emailSubject,
+      });
 
       await this.emailService.sendTicketEmail({
         from: 'matheus.c.polletti@gmail.com',
         to: sendTo,
         ticketId: ticket.id,
         currentMessageId: newMessageId,
-        references: `${ticket.originalMessageId} ${lastMessageId}`,
+        inReplyTo: parentMessageIdHeader,
+        references: referencesHeader,
         content: dto.content,
         ticketSubject: emailSubject,
       });

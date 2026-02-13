@@ -12,6 +12,7 @@ export class EmailService {
     ticketSubject: string;
     content: string;
     currentMessageId: string;
+    inReplyTo?: string;
     references: string;
   }) {
     const {
@@ -21,29 +22,32 @@ export class EmailService {
       ticketSubject,
       content,
       currentMessageId,
+      inReplyTo,
       references,
     } = params;
 
     const tag = `[Ticket #${ticketId}]`;
 
-    console.log('id mensagem', currentMessageId);
-    console.log('references', references);
-
     const finalSubject = ticketSubject.includes(tag)
       ? ticketSubject
       : `${tag} ${ticketSubject}`;
+
+    const headers: Record<string, string> = {
+      'Message-ID': currentMessageId,
+      References: references,
+    };
+
+    if (inReplyTo) {
+      headers['In-Reply-To'] = inReplyTo;
+    }
 
     await this.mailerService.sendMail({
       from,
       to,
       subject: finalSubject,
-      html: `<p>${content}</p>`,
+      html: `<p>${content.replace(/\n/g, '<br>')}</p>`,
       text: content,
-      headers: {
-        'Message-ID': currentMessageId,
-        'In-Reply-To': references,
-        References: references,
-      },
+      headers: headers,
     });
   }
 }

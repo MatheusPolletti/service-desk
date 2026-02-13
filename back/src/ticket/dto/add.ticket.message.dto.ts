@@ -20,4 +20,7 @@ export class AddTicketMessageDTO {
   @IsOptional()
   @IsEnum(TicketStatus)
   status?: TicketStatus;
+
+  @IsString()
+  parentMessageId?: string;
 }
